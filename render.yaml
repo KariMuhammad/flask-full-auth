@@ -2,5 +2,10 @@ services:
   - type: web
     name: flask-full-auth
     env: python
-    buildCommand: "pip install -r requirements.txt && python run.py"
-    startCommand: "python run.py && flask run"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: |
+      flask db init
+      flask db migrate -m "Description of changes"
+      flask db upgrade
+
+      python main.py
