@@ -9,6 +9,7 @@ from users import users
 
 from schemas import UserSchema
 from models import User, TokenBlocklist
+import os
 
 def create_app():    
     app = Flask(__name__)        
@@ -19,9 +20,9 @@ def create_app():
     db.init_app(app)
     # Init JWT
     jwt.init_app(app)
-    # # Init Mail
-    # mail.init_app(app)
-
+    
+    
+    
     # Init Routes
     app.register_blueprint(auth)
     
@@ -78,3 +79,9 @@ def create_app():
         }), 401
 
     return app
+
+
+# main.py or app.py
+if __name__ == "__main__":
+    from run import app
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
