@@ -3,4 +3,4 @@ services:
     name: flask-full-auth
     env: python
     buildCommand: "pip install -r requirements.txt && python run.py"
-    startCommand: "export FLASK_APP=main.py && python main.py"
+    startCommand: "python run.py && flask run"
