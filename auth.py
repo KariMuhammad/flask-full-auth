@@ -1,22 +1,25 @@
-from flask import Blueprint, jsonify, request, current_app as app
+from flask import Blueprint, jsonify, request, current_app as app, url_for, redirect
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from itsdangerous import URLSafeTimedSerializer
 from models import User, TokenBlocklist, PasswordResetTokens
+from schemas import RegisterUserSchema, SignGoogleSchema
 from flask_mail import Mail, Message
+from extensions import oauth
+from authlib.jose import JoseError
+
+import os
 
 auth = Blueprint('auth', __name__, url_prefix="/auth")
 
 @auth.post("/register")
 def register():
     data = request.get_json()
+    schema = RegisterUserSchema()
     
-    user = User.get_by_username(data.get("username"))
-    
-    if user is not None:
-        return jsonify({"message": "Username already exists"}), 409
-    
-    if data.get("password") != data.get("confirm_password"):
-        return jsonify({"message": "Passwords do not match"}), 400
+    try:
+        schema.load(data)
+    except Exception as e:
+        return jsonify({"message": "Validation error", "error": e.messages}), 400
     
     new_user = User(
         username=data.get("username"),
@@ -41,8 +44,8 @@ def register():
         new_user.save()
         return jsonify({"message": "User created successfully"}), 201
     except Exception as e:
-        print(f"============ Failed to send email: {e}")
-        return jsonify({"message": "User created, but failed to send confirmation email"}), 500
+        print(f"Failed to send email: {e}")
+        return jsonify({"message": "User created, but failed to send confirmation email", "error": str(e)}), 500
 
 @auth.post("/login")
 def login():
@@ -174,3 +177,63 @@ def update_password(token):
     
     password_reset_token.delete()
     return jsonify({"message": "Password reset successfully"}), 200
+
+google = oauth.register(
+    name='google',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    authorize_params=None,
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',  # This is only needed if using openId to fetch user info
+    client_kwargs={'scope': 'email profile'},
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration'
+)
+
+@auth.get('/google')
+def login_with_google():
+    redirect_uri = url_for('auth.google_authorize', _external=True)
+    print(redirect_uri)
+    return google.authorize_redirect(redirect_uri)
+
+@auth.get('/google/authorize')
+def google_authorize():
+    token = google.authorize_access_token()  # Access token from google (needed to get user info)
+    resp = google.get('userinfo')  # userinfo contains stuff u specificed in the scrope
+    user_info = resp.json()
+    google_user = oauth.google.userinfo()  # uses openid endpoint to fetch user info
+                
+    user = User.make(
+        username=user_info.get("name"),
+        email=user_info.get("email"),
+        phone=user_info.get("id")[:11],
+        password=user_info.get("id")
+    )
+    
+    user_dict = {
+        "username": user_info.get("name"),
+        "email": user_info.get("email"),
+        "phone": user_info.get("id")[:11],
+        "password": user_info.get("id")
+    }
+    
+        
+    schema = SignGoogleSchema()
+    try:
+        schema.load(user_dict)
+    except Exception as e:
+        return jsonify({"message": "Validation error", "error": e.messages}), 400
+    
+    # JWT
+    user.save()
+    access_token = create_access_token(identity=user_info.get('name'))
+    refresh_token = create_refresh_token(identity=user_info.get('name'))
+        
+    return jsonify({
+        "message": "You are authenticated, You can go to your app.",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": user_info
+    })

@@ -34,6 +34,10 @@ class User(db.Model):
     def get_by_email(cls, email: str) -> 'User':
         return cls.query.filter_by(email=email).first()
     
+    @classmethod
+    def get_by_phone(cls, phone: str) -> 'User':
+        return cls.query.filter_by(phone=phone).first()
+    
     def save(self) -> None:
         db.session.add(self)
         db.session.commit()
@@ -56,7 +60,12 @@ class User(db.Model):
             return None
         
         return cls.query.filter_by(email=email).first()
-        
+    
+    @staticmethod
+    def make(username: str, email: str, phone: str, password: str) -> 'User':
+        user = User(username=username, email=email, phone=phone)
+        user.set_password(password)
+        return user
     
 class TokenBlocklist(db.Model):
     __tablename__ = 'token_blocklist'

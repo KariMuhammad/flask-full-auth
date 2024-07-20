@@ -2,7 +2,7 @@ from flask import Flask, jsonify
 from flask_mail import Mail
 from itsdangerous import URLSafeTimedSerializer
 
-from extensions import db, jwt
+from extensions import db, jwt, oauth
 from auth import auth
 from account import account
 from users import users
@@ -20,7 +20,8 @@ def create_app():
     db.init_app(app)
     # Init JWT
     jwt.init_app(app)
-    
+    # Oauth
+    oauth.init_app(app)
     
     
     # Init Routes
