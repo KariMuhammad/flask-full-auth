@@ -167,7 +167,7 @@ def update_password(token):
     
     password_reset_token = PasswordResetTokens.get_by_user_email(email)
     if password_reset_token is None or password_reset_token.token != token:
-        return jsonify({"message": "Invalid or expired token"}),
+        return jsonify({"message": "Invalid or expired token"}), 401
     
     if (data.get("new_password") != data.get("new_password_confirmation")):
         return jsonify({"message": "Passwords do not match"}), 400
